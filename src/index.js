@@ -1,118 +1,101 @@
-import './sass/index.scss';
-
+import Notiflix from 'notiflix';
+import NewsApiImageService from './searchImage';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-import Notiflix from 'notiflix';
-import ImagesApiService from './js/images-service.js';
-import markupImages from './js/render-card.js';
-import './js/components/io.js';
+import './css/styles.css';
 
-//!Variables
-const refs = {
-  searchForm: document.querySelector('.js-search-form'),
-  galleryContainer: document.querySelector('.gallery'),
-  sentinel: document.querySelector('#sentinel'),
-  // loadMoreBtn: document.querySelector('.load-more'),
-};
+const formEl = document.querySelector('#search-form');
+const divEl = document.querySelector('.gallery');
+const loadMoreBtn = document.querySelector('.load-more-button');
 
-const imagesApiService = new ImagesApiService();
+let isShown = 0;
 
-//!Listeners
-refs.searchForm.addEventListener('submit', onSearch);
-// refs.loadMoreBtn.addEventListener('click', onLoadMore);
+const ImageEl = new NewsApiImageService();
 
-// !Functions
+formEl.addEventListener('submit', onFormSubmit);
+loadMoreBtn.addEventListener('click', onLoadMore);
 
-// 1.1. Запрос на бекенд
-
-function onSearch(e) {
+async function onFormSubmit(e) {
   e.preventDefault();
-  imagesApiService.query = e.currentTarget.elements.searchQuery.value.trim();
-  imagesApiService.resetPage();
+  isShown = 0;
+  divEl.innerHTML = '';
+  ImageEl.resetPage();
+  ImageEl.query = e.target.elements.searchQuery.value.trim();
+  fetchImages();
+}
 
-  if (imagesApiService.query === '') {
-    return Notiflix.Notify.failure(
-      `❌ Ошибка, поле запроса не может быть пустым`
+function onLoadMore() {
+  ImageEl.incrementPage();
+  fetchImages();
+}
+
+async function fetchImages() {
+  loadMoreBtn.classList.add('is-hidden');
+
+  const response = await ImageEl.fetchImage();
+  const { hits, total } = response;
+
+  if (!hits.length) {
+    Notiflix.Notify.failure(
+      'Sorry, there are no images matching your search query. Please try again.'
     );
   }
-  renderGallery();
+
+  renderGallery(hits);
+
+  isShown += hits.length;
+
+  if (isShown < total) {
+    loadMoreBtn.classList.remove('is-hidden');
+  }
+  if (isShown >= total) {
+    Notiflix.Notify.info(
+      `We are sorry, but you have reached the end of search results.`
+    );
+  }
 }
-// 1.2. Рендер разметки
-async function renderGallery() {
-  try {
-    imagesApiService.fetchImages().then(data => {
-      clearImageContainer();
-      // refs.loadMoreBtn.classList.remove('is-hidden');
-      if (!data.hits.length) {
-        Notiflix.Notify.warning(
-          `Sorry, there are no images matching your search query. Please try again.`
-        );
-        // refs.loadMoreBtn.classList.add('is-hidden');
-        return;
+
+function renderGallery(elements) {
+  const markup = elements
+    .map(
+      ({
+        webformatURL,
+        largeImageURL,
+        tags,
+        likes,
+        views,
+        comments,
+        downloads,
+      }) => {
+        return `
+            <a class="gallery__link" href="${largeImageURL}">
+                <div class="photo-card">
+                    <img src="${webformatURL}" alt="${tags}" loading="lazy" />
+                    <div class="info">
+                        <p class="info-item">
+                            <b>Likes</b>
+                            ${likes}
+                        </p>
+                        <p class="info-item">
+                            <b>Views</b>
+                            ${views}
+                        </p>
+                        <p class="info-item">
+                            <b>Comments</b>
+                            ${comments}
+                        </p>
+                        <p class="info-item">
+                            <b>Downloads</b>
+                            ${downloads}
+                        </p>
+                    </div>
+                </div>
+            </a>
+        `;
       }
-      appendImagesMarkup(data);
-      Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images !!!`);
-      lightbox.refresh();
-    });
+    )
+    .join('');
 
-    var lightbox = new SimpleLightbox('.gallery a');
-    lightbox.refresh();
-  } catch (error) {
-    Notify.failure(
-      "We're sorry, but you've reached the end of search results."
-    );
-  }
-}
-
-// 1.3. Загрузить больше
-// function onLoadMore() {
-//   imagesApiService.fetchImages().then(data => {
-//     if (data.hits.totalHits === data.hits.totalPages) {
-//       Notiflix.Notify.info(
-//         "We're sorry, but you've reached the end of search results."
-//       );
-//       refs.loadMoreBtn.classList.add('is-hidden');
-//       return;
-//     }
-//     appendImagesMarkup(data);
-//   });
-// }
-
-// 1.4. Добавляем разметку в хтмл
-function appendImagesMarkup(images) {
-  refs.galleryContainer.insertAdjacentHTML('beforeend', markupImages(images));
-}
-// 1.5. Чистим контейнер
-function clearImageContainer() {
-  refs.galleryContainer.innerHTML = '';
-}
-
-// 1.6. Infinity scroll
-
-const onEntry = entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting && imagesApiService.query !== '') {
-      feachMore();
-    }
-  });
-};
-
-let observer = new IntersectionObserver(onEntry, {
-  rootMargin: '200px',
-});
-observer.observe(refs.sentinel);
-
-function feachMore() {
-  imagesApiService.fetchImages().then(data => {
-    appendImagesMarkup(data);
-    imagesApiService.incrementPage();
-    if (data.hits.length < 40) {
-      Notiflix.Notify.info(
-        "We're sorry, but you've reached the end of search results."
-      );
-      return;
-    }
-    appendImagesMarkup(data);
-    imagesApiService.incrementPage();
-  });
+  divEl.insertAdjacentHTML('beforeend', markup);
+  const simpleLightBox = new SimpleLightbox('.gallery a');
 }
