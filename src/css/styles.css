@@ -45,7 +45,6 @@ button {
 }
 
 .is-hidden {
-    
     display: none;
     justify-content: center;
 }
@@ -116,8 +115,7 @@ p {
 
 .load-more-button {
     
+    
     margin-top: 50px;
     margin-left: 45.5%;
-   
-    
 }

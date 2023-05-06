@@ -21,6 +21,9 @@ async function onFormSubmit(e) {
   divEl.innerHTML = '';
   ImageEl.resetPage();
   ImageEl.query = e.target.elements.searchQuery.value.trim();
+  if (ImageEl.query === '') {
+    return
+  }
   fetchImages();
 }
 
@@ -39,6 +42,7 @@ async function fetchImages() {
     Notiflix.Notify.failure(
       'Sorry, there are no images matching your search query. Please try again.'
     );
+    return
   }
 
   renderGallery(hits);
